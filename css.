@@ -1,0 +1,75 @@
+// Sample code for color conversions
+// Conversion can also be done using ICC profiles and a Color Management System
+// For clarity, a library is used for matrix multiplication (multiply-matrices.js)
+
+// standard white points, defined by 4-figure CIE x,y chromaticities
+const D50 = [0.3457 / 0.3585, 1.00000, (1.0 - 0.3457 - 0.3585) / 0.3585];
+const D65 = [0.3127 / 0.3290, 1.00000, (1.0 - 0.3127 - 0.3290) / 0.3290];
+
+// sRGB-related functions
+
+function lin_sRGB(RGB) {
+	// convert an array of sRGB values
+	// where in-gamut values are in the range [0 - 1]
+	// to linear light (un-companded) form.
+	// https://en.wikipedia.org/wiki/SRGB
+	// Extended transfer function:
+	// for negative values,  linear portion is extended on reflection of axis,
+	// then reflected power function is used.
+	return RGB.map(function (val) {
+		let sign = val < 0? -1 : 1;
+		let abs = Math.abs(val);
+
+		if (abs < 0.04045) {
+			return val / 12.92;
+		}
+
+		return sign * (Math.pow((abs + 0.055) / 1.055, 2.4));
+	});
+}
+
+function gam_sRGB(RGB) {
+	// convert an array of linear-light sRGB values in the range 0.0-1.0
+	// to gamma corrected form
+	// https://en.wikipedia.org/wiki/SRGB
+	// Extended transfer function:
+	// For negative values, linear portion extends on reflection
+	// of axis, then uses reflected pow below that
+	return RGB.map(function (val) {
+		let sign = val < 0? -1 : 1;
+		let abs = Math.abs(val);
+
+		if (abs > 0.0031308) {
+			return sign * (1.055 * Math.pow(abs, 1/2.4) - 0.055);
+		}
+
+		return 12.92 * val;
+	});
+}
+
+function lin_sRGB_to_XYZ(rgb) {
+	// convert an array of linear-light sRGB values to CIE XYZ
+	// using sRGB's own white, D65 (no chromatic adaptation)
+
+	var M = [
+		[ 506752 / 1228815,  87881 / 245763,   12673 /   70218 ],
+		[  87098 /  409605, 175762 / 245763,   12673 /  175545 ],
+		[   7918 /  409605,  87881 / 737289, 1001167 / 1053270 ],
+	];
+	return multiplyMatrices(M, rgb);
+}
+
+function XYZ_to_lin_sRGB(XYZ) {
+	// convert XYZ to linear-light sRGB
+
+	var M = [
+		[   12831 /   3959,    -329 /    214, -1974 /   3959 ],
+		[ -851781 / 878810, 1648619 / 878810, 36519 / 878810 ],
+		[     705 /  12673,   -2585 /  12673,   705 /    667 ],
+	];
+
+	return multiplyMatrices(M, XYZ);
+}
+
+//  display-p3-related functions
+
